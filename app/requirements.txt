@@ -1,0 +1,11 @@
+langchain==0.3.7
+langchain-core==0.3.21
+langchain-qdrant==0.2.0
+langchain-text-splitters==0.3.2
+langchain-community==0.3.7
+langchain-huggingface==0.1.2
+sentence-transformers==3.3.1
+qdrant-client==1.12.1
+python-telegram-bot==21.7
+python-dotenv==1.0.1
+watchdog==5.0.3

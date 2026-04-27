@@ -1,0 +1,25 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime logs
+*.log
+bot.log
+
+# Local vector DB / generated data
+data/qdrant_storage/
+
+# Local tool/editor state
+.omc/
+.DS_Store
+.idea/
+.vscode/
