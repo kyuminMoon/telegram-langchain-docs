@@ -27,44 +27,44 @@ LangChain LCEL 체인 + Qdrant 벡터 DB + python-telegram-bot 으로 구성.
 
 ```mermaid
 flowchart LR
-    User([👤 팀원])
-    TG[Telegram<br/>@your_company_docs_bot]
+    User(["👤팀원"])
+    TG["Telegram<br>@your_company_docs_bot"]
 
     subgraph Mac["🖥️ 호스트 (Macbook)"]
         subgraph Bot["Python 봇 프로세스 (.venv)"]
-            BotPy["bot.py<br/>python-telegram-bot"]
-            RagPy["rag.py<br/>LangChain LCEL"]
-            BGE[("BGE-M3<br/>임베딩 모델<br/>≈ 600MB RAM")]
-            BGER[("BGE-Reranker-v2-m3<br/>cross-encoder<br/>≈ 600MB RAM")]
+            BotPy["bot.py<br>python-telegram-bot"]
+            RagPy["rag.py<br>LangChain LCEL"]
+            BGE[("BGE-M3<br>임베딩 모델<br>약 600MB RAM")]
+            BGER[("BGE-Reranker-v2-m3<br>cross-encoder<br>약 600MB RAM")]
             BotPy -->|"answer(query)"| RagPy
         end
 
-        Codex[["codex CLI<br/>(ChatGPT 인증)"]]
+        Codex[["codex CLI<br>(ChatGPT 인증)"]]
 
         subgraph Pod["Podman 컨테이너"]
-            Qdrant[(Qdrant<br/>vector DB<br/>:6333)]
+            Qdrant[("Qdrant<br>vector DB<br>:6333")]
         end
 
-        Docs[/"data/docs/<br/>*.md"/]
+        Docs[/"data/docs/<br>*.md"/]
     end
 
     User -->|"/ask 질문"| TG
     TG <-->|long polling| BotPy
 
-    RagPy -->|"1️⃣ embed query"| BGE
+    RagPy -->|"1. embed query"| BGE
     BGE -->|"vector(1024d)"| RagPy
-    RagPy -->|"2️⃣ similarity search<br/>top-20 후보"| Qdrant
+    RagPy -->|"2. similarity search<br>top-20 후보"| Qdrant
     Qdrant -->|"20 chunks"| RagPy
-    RagPy -->|"3️⃣ rerank<br/>(query, doc) pairs"| BGER
+    RagPy -->|"3. rerank<br>(query, doc) pairs"| BGER
     BGER -->|"top-5 정제 결과"| RagPy
-    RagPy -->|"4️⃣ subprocess<br/>codex exec"| Codex
+    RagPy -->|"4. subprocess<br>codex exec"| Codex
     Codex -->|"한국어 답변"| RagPy
 
-    Docs -.watchdog 감지.-> BotPy
-    BotPy -.indexer.reindex_path<br/>(증분 upsert).-> Qdrant
-    TG -.📎 .md 첨부.-> BotPy
-    BotPy -.download +<br/>data/docs 저장.-> Docs
-    INGEST[ingest.py<br/>전체 재생성] -.수동 1회.-> Qdrant
+    Docs -.->|"watchdog 감지"| BotPy
+    BotPy -.->|"indexer.reindex_path<br>증분 upsert"| Qdrant
+    TG -.->|".md 첨부"| BotPy
+    BotPy -.->|"download +<br>data/docs 저장"| Docs
+    INGEST["ingest.py<br>전체 재생성"] -.->|"수동 1회"| Qdrant
 ```
 
 ---
@@ -74,14 +74,14 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    participant U as 👤 사용자
+    participant U as 사용자
     participant T as Telegram
     participant B as bot.py
     participant L as rag.py (LCEL)
-    participant W as GPT-5.4-mini<br/>Query Rewriter<br/>(추가 예정)
-    participant E as BGE-M3<br/>(임베더)
+    participant W as GPT-5.4-mini Query Rewriter (추가 예정)
+    participant E as BGE-M3 임베더
     participant Q as Qdrant
-    participant R as BGE-Reranker<br/>(cross-encoder)
+    participant R as BGE-Reranker cross-encoder
     participant C as codex CLI
 
     U->>T: "신입사원 연차 며칠이야?"
@@ -101,14 +101,14 @@ sequenceDiagram
     Q-->>L: 20 chunks (1차 후보)
 
     L->>R: predict([(query 또는 search_query, doc.text)] × 20)
-    Note over R: cross-encoder 가<br/>query + doc 를<br/>한 번에 입력받아<br/>관련도 score 산출
+    Note over R: cross-encoder 가 query + doc 를 한 번에 입력받아 관련도 score 산출
     R-->>L: scores → 정렬 → top-5
 
     L->>L: format_docs(top-5) → context
     L->>L: PROMPT_TEMPLATE.format()
 
     L->>C: subprocess.run(["codex","exec",...,prompt])
-    Note over C: ChatGPT 호출<br/>(API 키 X)
+    Note over C: ChatGPT 호출 (API 키 X)
     C-->>L: stdout (한국어 답변)
 
     L-->>B: {answer, sources}
@@ -130,20 +130,20 @@ sequenceDiagram
     participant Op as 운영자
     participant I as ingest.py
     participant FS as data/docs/*.md
-    participant TS as RecursiveCharacter<br/>TextSplitter
+    participant TS as RecursiveCharacter TextSplitter
     participant E as BGE-M3
     participant Q as Qdrant
 
     Op->>I: ./scripts/ingest.sh
     I->>Q: collection_exists?
     Q-->>I: true → delete + recreate
-    I->>Q: create_collection<br/>(size=1024, COSINE)
+    I->>Q: create_collection(size=1024, COSINE)
 
     I->>FS: glob("*.md")
     FS-->>I: N files
     I->>TS: split_documents(chunk_size=500, overlap=50)
     TS-->>I: M chunks
-    Note over I,E: 첫 1회 BGE-M3 다운로드<br/>(~600MB, 캐시 후 재사용)
+    Note over I,E: 첫 1회 BGE-M3 다운로드 (~600MB, 캐시 후 재사용)
     I->>E: embed_documents(chunks)
     E-->>I: M vectors[1024]
     I->>Q: add_documents(chunks + vectors)
@@ -163,25 +163,25 @@ flowchart TD
     B -->|"/ask <Q>"| C[CommandHandler]
     B -->|일반 텍스트| D[MessageHandler]
     B -->|"/start"| S[start_command]
-    B -->|"📎 .md 파일 첨부"| DOC[document_handler]
+    B -->|".md 파일 첨부"| DOC[document_handler]
 
-    C --> E[권한 체크<br/>TELEGRAM_ALLOWED_USER_IDS]
+    C --> E["권한 체크<br>TELEGRAM_ALLOWED_USER_IDS"]
     D --> E
     DOC --> E2[권한 체크]
     E -->|차단| Z[무응답/거부 메시지]
     E -->|통과| F[asyncio.to_thread]
-    E2 -->|통과| DL["safe_filename →<br/>data/docs/ 저장 →<br/>indexer.reindex_path"]
+    E2 -->|통과| DL["safe_filename →<br>data/docs/ 저장 →<br>indexer.reindex_path"]
 
-    F --> G0["Stage 0 [추가 예정]<br/>GPT-5.4-mini<br/>Text-to-Query / Query Rewrite"]
-    G0 --> G1["Stage 1<br/>BGE-M3 임베딩 +<br/>Qdrant 검색<br/>(top-20)"]
-    F -.현재 구현.-> G1
-    G1 --> G2["Stage 2<br/>BGE-Reranker<br/>cross-encoder<br/>(top-5)"]
-    G2 --> H[Prompt 조립<br/>SYSTEM + 문서 + 질문]
+    F --> G0["Stage 0 [추가 예정]<br>GPT-5.4-mini<br>Text-to-Query / Query Rewrite"]
+    G0 --> G1["Stage 1<br>BGE-M3 임베딩 +<br>Qdrant 검색<br>(top-20)"]
+    F -.->|"현재 구현"| G1
+    G1 --> G2["Stage 2<br>BGE-Reranker<br>cross-encoder<br>(top-5)"]
+    G2 --> H["Prompt 조립<br>SYSTEM + 문서 + 질문"]
     H --> I[codex exec subprocess]
     I --> J{성공?}
-    J -->|예| K[ANSI 제거<br/>+ 출처 부착]
+    J -->|예| K["ANSI 제거<br>+ 출처 부착"]
     J -->|아니오| L[에러 메시지]
-    K --> M[Telegram reply<br/>≤ 3900자 절단]
+    K --> M["Telegram reply<br>3900자 이하로 절단"]
     L --> M
     S --> M
     DL --> RC["✓ N 청크 적재 응답"]
